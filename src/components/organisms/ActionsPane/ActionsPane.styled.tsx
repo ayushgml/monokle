@@ -108,3 +108,31 @@ export const Tabs = styled(RawTabs)<{$height: number}>`
     background: transparent;
   }
 `;
+
+export const SmartPaneButtonContainer = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 4px 0px;
+  margin-top: -70px;
+  z-index: 200;
+`;
+
+export const SmartPaneButton = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  background-color: ${Colors.grey3};
+  margin-left: 40px;
+  border-radius: 20px;
+
+  &:hover {
+    cursor: pointer;
+  }
+`;
+
+export const SmartPane = styled.div`
+  display: flex;
+  padding: 10px;
+  z-index: 200;
+`;

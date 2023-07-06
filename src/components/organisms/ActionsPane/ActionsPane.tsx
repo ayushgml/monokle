@@ -5,7 +5,7 @@ import {useMeasure} from 'react-use';
 
 import {Tooltip} from 'antd';
 
-import {BookOutlined} from '@ant-design/icons';
+import {BookOutlined, UpCircleFilled} from '@ant-design/icons';
 
 import {DEFAULT_PANE_TITLE_HEIGHT, HELM_CHART_HELP_URL, KUSTOMIZE_HELP_URL, TOOLTIP_DELAY} from '@constants/constants';
 import {makeApplyKustomizationText, makeApplyResourceText} from '@constants/makeApplyText';
@@ -57,7 +57,7 @@ import CodeEditor from '@src/editor/CodeEditor';
 import {getResourceKindHandler} from '@src/kindhandlers';
 import {extractFormSchema} from '@src/kindhandlers/common/customObjectKindHandler';
 
-import {Icon} from '@monokle/components';
+import {Icon, ResizableRowsPanel} from '@monokle/components';
 import {ActionPaneTab} from '@shared/models/appState';
 import {HelmChart} from '@shared/models/helm';
 import {trackEvent} from '@shared/utils';
@@ -67,6 +67,7 @@ import {openExternalResourceKindDocumentation} from '@shared/utils/shell';
 
 import * as S from './ActionsPane.styled';
 import ActionsPaneHeader from './ActionsPaneHeader';
+import SmartPane from './SmartPane';
 
 // TODO: we should also check if the selectedFile entry has only one resource and if so, to set the selectedResource to be that for this component
 const ActionsPane: React.FC = () => {
@@ -104,12 +105,22 @@ const ActionsPane: React.FC = () => {
   const settings = useAppSelector(settingsSelector);
   const localResourceMetaMap = useResourceMetaMap('local');
 
+  const [isEditorActive, setIsEditorActive] = useState(true);
+  const [smartpaneIsOpen, setSmartpaneIsOpen] = useState(false);
+  const [SmartPaneheight, setSmartPaneHeight] = useState(200);
+
   const height = usePaneHeight();
+
+  const [rowSizes, setRowSizes] = useState([height - SmartPaneheight, SmartPaneheight]);
 
   // Could not get the ref of Tabs Component
   const tabsList = document.getElementsByClassName('ant-tabs-nav-list');
   const extraButton = useRef<any>();
   const [actionsPaneRef, {width: actionsPaneWidth}] = useMeasure<HTMLDivElement>();
+
+  const rowsSizes = useMemo(() => {
+    return [height - SmartPaneheight, SmartPaneheight];
+  }, [height, SmartPaneheight, smartpaneIsOpen]);
 
   const getDistanceBetweenTwoComponents = useCallback(() => {
     const tabsListEl = tabsList[0].getBoundingClientRect();
@@ -400,106 +411,132 @@ const ActionsPane: React.FC = () => {
     ]
   );
 
+  const openSmartPanel = () => {
+    setSmartpaneIsOpen(true);
+    console.log('open smart panel');
+  };
+
+  const handleRowResize = (sizes: number[]) => {
+    setRowSizes(sizes);
+  };
+
   return (
-    <S.ActionsPaneMainContainer ref={actionsPaneRef} id="EditorPane" $height={height - 21}>
-      <ActionsPaneHeader
-        actionsPaneWidth={actionsPaneWidth}
-        applySelection={applySelection}
-        selectedResourceMeta={selectedResource}
-      />
+    <ResizableRowsPanel
+      defaultSizes={rowsSizes}
+      top={
+        <S.ActionsPaneMainContainer ref={actionsPaneRef} id="EditorPane" $height={height - 21}>
+          <ActionsPaneHeader
+            actionsPaneWidth={actionsPaneWidth}
+            applySelection={applySelection}
+            selectedResourceMeta={selectedResource}
+          />
 
-      {selection?.type === 'preview.configuration' ? (
-        <PreviewConfigurationDetails />
-      ) : selection?.type === 'image' ? (
-        <ImageDetails />
-      ) : selectedResource || selectedFilePath || selectedHelmValues ? (
-        <S.Tabs
-          $height={height - DEFAULT_PANE_TITLE_HEIGHT - 8}
-          defaultActiveKey="source"
-          activeKey={activeEditorTab}
-          items={tabItems}
-          onChange={k => {
-            dispatch(setActiveEditorTab(k as ActionPaneTab));
-            if (k === 'graph') {
-              trackEvent('edit/graphview', {resourceKind: selectedResource?.kind});
-            }
-            if (k === 'form') {
-              trackEvent('edit/form_editor', {resourceKind: selectedResource?.kind});
-            }
-            if (k === 'source') {
-              trackEvent('edit/source', {resourceKind: selectedResource?.kind});
-            }
-          }}
-          tabBarExtraContent={
-            selectedResource && resourceKindHandler?.helpLink ? (
-              <>
-                <Tooltip mouseEnterDelay={TOOLTIP_DELAY} title={EditWithFormTooltip}>
-                  <S.ExtraRightButton
-                    disabled={!isSchemaAvailable}
-                    type="link"
-                    onClick={() => dispatch(toggleForm(true))}
-                    ref={extraButton}
-                  >
-                    <Icon name="split-view" />
-                  </S.ExtraRightButton>
-                </Tooltip>
-                <Tooltip mouseEnterDelay={TOOLTIP_DELAY} title={OpenExternalDocumentationTooltip}>
-                  <S.ExtraRightButton
-                    onClick={() => openExternalResourceKindDocumentation(resourceKindHandler?.helpLink)}
-                    type="link"
-                    ref={extraButton}
-                  >
-                    <BookOutlined />
-                  </S.ExtraRightButton>
-                </Tooltip>
-              </>
-            ) : isKustomization ? (
-              <Tooltip mouseEnterDelay={TOOLTIP_DELAY} title={OpenKustomizeDocumentationTooltip}>
-                <S.ExtraRightButton
-                  onClick={() => openExternalResourceKindDocumentation(KUSTOMIZE_HELP_URL)}
-                  type="link"
-                  ref={extraButton}
-                >
-                  {isButtonShrinked ? '' : `See Kustomization documentation`} <BookOutlined />
-                </S.ExtraRightButton>
-              </Tooltip>
-            ) : selectedFilePath && isHelmChartFile(selectedFilePath) ? (
-              <Tooltip mouseEnterDelay={TOOLTIP_DELAY} title={OpenHelmChartDocumentationTooltip}>
-                <S.ExtraRightButton
-                  onClick={() => openExternalResourceKindDocumentation(HELM_CHART_HELP_URL)}
-                  type="link"
-                  ref={extraButton}
-                >
-                  {isButtonShrinked ? '' : `See Helm Chart documentation`} <BookOutlined />
-                </S.ExtraRightButton>
-              </Tooltip>
-            ) : null
-          }
-        />
-      ) : (
-        !settings.hideEditorPlaceholder && (isFolderLoading ? <S.Skeleton active /> : <MonacoPlaceholder />)
-      )}
+          {selection?.type === 'preview.configuration' ? (
+            <PreviewConfigurationDetails />
+          ) : selection?.type === 'image' ? (
+            <ImageDetails />
+          ) : selectedResource || selectedFilePath || selectedHelmValues ? (
+            <S.Tabs
+              $height={height - DEFAULT_PANE_TITLE_HEIGHT - 8}
+              defaultActiveKey="source"
+              activeKey={activeEditorTab}
+              items={tabItems}
+              onChange={k => {
+                dispatch(setActiveEditorTab(k as ActionPaneTab));
+                if (k === 'graph') {
+                  trackEvent('edit/graphview', {resourceKind: selectedResource?.kind});
+                }
+                if (k === 'form') {
+                  trackEvent('edit/form_editor', {resourceKind: selectedResource?.kind});
+                }
+                if (k === 'source') {
+                  trackEvent('edit/source', {resourceKind: selectedResource?.kind});
+                }
+              }}
+              tabBarExtraContent={
+                selectedResource && resourceKindHandler?.helpLink ? (
+                  <>
+                    <Tooltip mouseEnterDelay={TOOLTIP_DELAY} title={EditWithFormTooltip}>
+                      <S.ExtraRightButton
+                        disabled={!isSchemaAvailable}
+                        type="link"
+                        onClick={() => dispatch(toggleForm(true))}
+                        ref={extraButton}
+                      >
+                        <Icon name="split-view" />
+                      </S.ExtraRightButton>
+                    </Tooltip>
+                    <Tooltip mouseEnterDelay={TOOLTIP_DELAY} title={OpenExternalDocumentationTooltip}>
+                      <S.ExtraRightButton
+                        onClick={() => openExternalResourceKindDocumentation(resourceKindHandler?.helpLink)}
+                        type="link"
+                        ref={extraButton}
+                      >
+                        <BookOutlined />
+                      </S.ExtraRightButton>
+                    </Tooltip>
+                  </>
+                ) : isKustomization ? (
+                  <Tooltip mouseEnterDelay={TOOLTIP_DELAY} title={OpenKustomizeDocumentationTooltip}>
+                    <S.ExtraRightButton
+                      onClick={() => openExternalResourceKindDocumentation(KUSTOMIZE_HELP_URL)}
+                      type="link"
+                      ref={extraButton}
+                    >
+                      {isButtonShrinked ? '' : `See Kustomization documentation`} <BookOutlined />
+                    </S.ExtraRightButton>
+                  </Tooltip>
+                ) : selectedFilePath && isHelmChartFile(selectedFilePath) ? (
+                  <Tooltip mouseEnterDelay={TOOLTIP_DELAY} title={OpenHelmChartDocumentationTooltip}>
+                    <S.ExtraRightButton
+                      onClick={() => openExternalResourceKindDocumentation(HELM_CHART_HELP_URL)}
+                      type="link"
+                      ref={extraButton}
+                    >
+                      {isButtonShrinked ? '' : `See Helm Chart documentation`} <BookOutlined />
+                    </S.ExtraRightButton>
+                  </Tooltip>
+                ) : null
+              }
+            />
+          ) : (
+            !settings.hideEditorPlaceholder && (isFolderLoading ? <S.Skeleton active /> : <MonacoPlaceholder />)
+          )}
 
-      {isApplyModalVisible && (
-        <ModalConfirmWithNamespaceSelect
-          isVisible={isApplyModalVisible}
-          resourceMetaList={selectedResource ? [selectedResource] : []}
-          title={confirmModalTitle}
-          onOk={selectedNamespace => onClickApplyResource(selectedNamespace)}
-          onCancel={() => setIsApplyModalVisible(false)}
-        />
-      )}
-      {isHelmChartApplyModalVisible && (
-        <HelmChartModalConfirmWithNamespaceSelect
-          isVisible={isHelmChartApplyModalVisible}
-          title={helmChartConfirmModalTitle}
-          onCancel={() => setIsHelmChartApplyModalVisible(false)}
-          onOk={(selectedNamespace, shouldCreateNamespace) =>
-            onClickApplyHelmChart(selectedNamespace, shouldCreateNamespace)
-          }
-        />
-      )}
-    </S.ActionsPaneMainContainer>
+          {isApplyModalVisible && (
+            <ModalConfirmWithNamespaceSelect
+              isVisible={isApplyModalVisible}
+              resourceMetaList={selectedResource ? [selectedResource] : []}
+              title={confirmModalTitle}
+              onOk={selectedNamespace => onClickApplyResource(selectedNamespace)}
+              onCancel={() => setIsApplyModalVisible(false)}
+            />
+          )}
+          {isHelmChartApplyModalVisible && (
+            <HelmChartModalConfirmWithNamespaceSelect
+              isVisible={isHelmChartApplyModalVisible}
+              title={helmChartConfirmModalTitle}
+              onCancel={() => setIsHelmChartApplyModalVisible(false)}
+              onOk={(selectedNamespace, shouldCreateNamespace) =>
+                onClickApplyHelmChart(selectedNamespace, shouldCreateNamespace)
+              }
+            />
+          )}
+
+          {isEditorActive && !smartpaneIsOpen && (
+            <S.SmartPaneButtonContainer>
+              <S.SmartPaneButton onClick={openSmartPanel}>
+                <UpCircleFilled style={{marginRight: '5px'}} />
+                Smart Pane
+              </S.SmartPaneButton>
+            </S.SmartPaneButtonContainer>
+          )}
+        </S.ActionsPaneMainContainer>
+      }
+      bottom={<SmartPane />}
+      isBottomVisible={smartpaneIsOpen}
+      onDragEnd={handleRowResize}
+    />
   );
 };
 
